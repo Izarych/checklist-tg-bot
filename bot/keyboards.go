@@ -1,12 +1,15 @@
 package bot
 
 import (
+	"checklist-tg-bot/models"
 	"log"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"gorm.io/gorm"
 )
 
-func SendMainKeyboard(b *Bot, chatID int64) {
+func SendMainKeyboard(b *Bot, chatID int64, userName string) {
+	createUser(b.DB, chatID, userName)
 	msg := tgbotapi.NewMessage(chatID, "Привет! Нажми на кнопку ниже:")
 
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
@@ -35,8 +38,19 @@ func SendMessage(b *Bot, chatID int64, text string) {
 	}
 }
 
-func ReplyCallback(b *Bot, callbackID string, text string) {
-	if _, err := b.API.Request(tgbotapi.NewCallback(callbackID, text)); err != nil {
+func ReplyCallback(b *Bot, callbackID string) {
+	if _, err := b.API.Request(tgbotapi.NewCallback(callbackID, "")); err != nil {
 		log.Printf("Ошибка при ответе на callback: %v", err)
+	}
+}
+
+func createUser(db *gorm.DB, userID int64, userName string) {
+	var user models.User
+
+	if err := db.FirstOrCreate(&user, models.User{
+		TgUserID: uint(userID),
+		Name:     userName,
+	}).Error; err != nil {
+		log.Printf("Ошибка при создании пользователя: %v", err)
 	}
 }

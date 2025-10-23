@@ -23,7 +23,7 @@ func HandleCallback(b *Bot, query *tgbotapi.CallbackQuery) {
 	switch {
 	case data == "create_checklist":
 		pendingChecklists[chatID] = true
-		ReplyCallback(b, query.ID, "Хорошо, напиши название чеклиста")
+		ReplyCallback(b, query.ID)
 		SendMessage(b, chatID, "Напиши название нового чеклиста:")
 
 	case data == "list_checklist":
@@ -39,12 +39,12 @@ func HandleCallback(b *Bot, query *tgbotapi.CallbackQuery) {
 		checklist.GetChecklist(b.DB, b.API, chatID, query.ID, data)
 
 	case data == "get-id":
-		ReplyCallback(b, query.ID, fmt.Sprintf("Ваш ID: %d", userID))
+		ReplyCallback(b, query.ID)
 		SendMessage(b, chatID, fmt.Sprintf("Ваш ID: %d", userID))
 
 	case data == "add-friend":
 		pendingFriends[chatID] = true
-		ReplyCallback(b, query.ID, "Введите ID друга")
+		ReplyCallback(b, query.ID)
 		SendMessage(b, chatID, "Введите ID друга")
 	}
 }
@@ -69,6 +69,6 @@ func HandleMessage(b *Bot, msg *tgbotapi.Message) {
 
 	switch text {
 	case "/start", "/help":
-		SendMainKeyboard(b, chatID)
+		SendMainKeyboard(b, chatID, userName)
 	}
 }

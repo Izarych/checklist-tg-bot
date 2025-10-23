@@ -2,7 +2,9 @@ package bot
 
 import (
 	"log"
+	"os"
 
+	"github.com/joho/godotenv"
 	"gorm.io/gorm"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -14,7 +16,11 @@ type Bot struct {
 }
 
 func NewBot(db *gorm.DB) (*Bot, error) {
-	token := ""
+	if err := godotenv.Load(".env"); err != nil {
+		log.Println(".env файл не найден")
+	}
+
+	token := os.Getenv("BOT_TOKEN")
 
 	botAPI, err := tgbotapi.NewBotAPI(token)
 

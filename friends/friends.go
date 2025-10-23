@@ -43,9 +43,13 @@ func AddFriend(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, userID int64, us
 	if err := db.Create(&userFriend).Error; err != nil {
 		log.Printf("Ошибка при добавлении друга: %v", err)
 		sendMessage(bot, chatID, "Ошибка при добавлении друга.")
-	} else {
-		sendMessage(bot, chatID, fmt.Sprintf("Пользователь %s успешно добавлен в друзья ✅", friend.Name))
+		return
 	}
+
+	sendMessage(bot, chatID, fmt.Sprintf("Пользователь %s успешно добавлен в друзья ✅", friend.Name))
+
+	notifyText := fmt.Sprintf("👋 Вас добавил в друзья пользователь %s!", currentUser.Name)
+	sendMessage(bot, int64(friend.TgUserID), notifyText)
 }
 
 func sendMessage(bot *tgbotapi.BotAPI, chatID int64, text string) {
