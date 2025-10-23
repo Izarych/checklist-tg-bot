@@ -2,6 +2,7 @@ package main
 
 import (
 	"checklist-tg-bot/models"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -38,7 +39,7 @@ func main() {
 		log.Fatalf("Ошибка подключения к БД: %v", err)
 	}
 
-	err = db.AutoMigrate(&models.Checklist{})
+	err = db.AutoMigrate(&models.Checklist{}, &models.User{}, &models.UserFriend{})
 	if err != nil {
 		panic(err)
 	}
@@ -60,6 +61,7 @@ func main() {
 
 	updates := bot.GetUpdatesChan(u)
 	pendingChecklists := make(map[int64]bool)
+	pendingFriends := make(map[int64]bool)
 
 	for update := range updates {
 
@@ -123,6 +125,31 @@ func main() {
 				msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("Вы выбрали чеклист: %s", checklist.Title))
 				_, _ = bot.Send(msg)
 			}
+
+			if data == "get-id" {
+				callback := tgbotapi.NewCallback(update.CallbackQuery.ID, fmt.Sprintf("Ваш ID: %d", userId))
+				if _, err := bot.Request(callback); err != nil {
+					log.Printf("Ошибка при ответе на callback: %v", err)
+				}
+				msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("Ваш ID: %d", userId))
+				if _, err := bot.Send(msg); err != nil {
+					log.Printf("Ошибка при отправке сообщения: %v", err)
+				}
+			}
+
+			if data == "add-friend" {
+				callback := tgbotapi.NewCallback(update.CallbackQuery.ID, "Введите ID друга")
+				if _, err := bot.Request(callback); err != nil {
+					log.Printf("Ошибка при ответе на callback: %v", err)
+				}
+				msg := tgbotapi.NewMessage(chatID, "Введите ID друга")
+				if _, err := bot.Send(msg); err != nil {
+					log.Printf("Ошибка при отправке сообщения: %v", err)
+				}
+
+				pendingFriends[chatID] = true
+			}
+
 			continue
 		}
 
@@ -153,6 +180,43 @@ func main() {
 			continue
 		}
 
+		if pendingFriends[chatID] {
+			friendID, err := strconv.ParseUint(text, 10, 64)
+			if err != nil {
+				msg := tgbotapi.NewMessage(chatID, "Введите корректный числовой ID друга.")
+				_, _ = bot.Send(msg)
+				continue
+			}
+
+			var friend models.User
+			result := db.Where("tg_user_id = ?", friendID).First(&friend)
+			if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+				msg := tgbotapi.NewMessage(chatID, "Такой пользователь еще не был в боте ❌")
+				_, _ = bot.Send(msg)
+				continue
+			}
+
+			var currentUser models.User
+			db.FirstOrCreate(&currentUser, models.User{TgUserID: uint(userId), Name: userName})
+
+			userFriend := models.UserFriend{
+				UserID:   currentUser.ID,
+				FriendID: friend.ID,
+			}
+
+			if err := db.Create(&userFriend).Error; err != nil {
+				log.Printf("Ошибка при добавлении друга: %v", err)
+				msg := tgbotapi.NewMessage(chatID, "Ошибка при добавлении друга.")
+				_, _ = bot.Send(msg)
+			} else {
+				msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("Пользователь %s успешно добавлен в друзья ✅", friend.Name))
+				_, _ = bot.Send(msg)
+			}
+
+			delete(pendingFriends, chatID)
+			continue
+		}
+
 		switch text {
 		case "/start":
 			msg := tgbotapi.NewMessage(chatID, "Привет! Нажми на кнопку ниже, чтобы создать чеклист.")
@@ -160,6 +224,12 @@ func main() {
 				tgbotapi.NewInlineKeyboardRow(
 					tgbotapi.NewInlineKeyboardButtonData("Создать чеклист", "create_checklist"),
 					tgbotapi.NewInlineKeyboardButtonData("Все чеклисты", "list_checklist"),
+				),
+				tgbotapi.NewInlineKeyboardRow(
+					tgbotapi.NewInlineKeyboardButtonData("Получить свой ID", "get-id"),
+				),
+				tgbotapi.NewInlineKeyboardRow(
+					tgbotapi.NewInlineKeyboardButtonData("Добавить друга", "add-friend"),
 				),
 			)
 			msg.ReplyMarkup = keyboard
@@ -174,6 +244,12 @@ func main() {
 				tgbotapi.NewInlineKeyboardRow(
 					tgbotapi.NewInlineKeyboardButtonData("Создать чеклист", "create_checklist"),
 					tgbotapi.NewInlineKeyboardButtonData("Все чеклисты", "list_checklist"),
+				),
+				tgbotapi.NewInlineKeyboardRow(
+					tgbotapi.NewInlineKeyboardButtonData("Получить свой ID", "get-id"),
+				),
+				tgbotapi.NewInlineKeyboardRow(
+					tgbotapi.NewInlineKeyboardButtonData("Добавить друга", "add-friend"),
 				),
 			)
 			msg.ReplyMarkup = keyboard
