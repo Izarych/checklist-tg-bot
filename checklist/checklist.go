@@ -66,6 +66,13 @@ func GetChecklist(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, callbackID st
 		log.Printf("Ошибка при ответе на callback: %v", err)
 	}
 
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("Создать задачу", fmt.Sprintf("create_task:%d", checklist.ID)),
+		),
+	)
+
 	msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("Вы выбрали чеклист: %s", checklist.Title))
+	msg.ReplyMarkup = keyboard
 	_, _ = bot.Send(msg)
 }

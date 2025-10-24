@@ -27,6 +27,7 @@ func HandleCallback(b *Bot, query *tgbotapi.CallbackQuery) {
 		SendMessage(b, chatID, "Напиши название нового чеклиста:")
 
 	case data == "list_checklist":
+		ReplyCallback(b, query.ID)
 		checklist.ListChecklists(b.DB, b.API, chatID, userID)
 
 	case strings.HasPrefix(data, "get_checklist:"):
@@ -36,6 +37,7 @@ func HandleCallback(b *Bot, query *tgbotapi.CallbackQuery) {
 			log.Printf("Ошибка парсинга id: %v", err)
 			return
 		}
+		ReplyCallback(b, query.ID)
 		checklist.GetChecklist(b.DB, b.API, chatID, query.ID, data)
 
 	case data == "get-id":
