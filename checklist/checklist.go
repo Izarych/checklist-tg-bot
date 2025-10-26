@@ -70,9 +70,67 @@ func GetChecklist(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, callbackID st
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("Создать задачу", fmt.Sprintf("create_task:%d", checklist.ID)),
 		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("Посмотреть задачи", fmt.Sprintf("list_tasks:%d", checklist.ID)),
+		),
 	)
 
 	msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("Вы выбрали чеклист: %s", checklist.Title))
 	msg.ReplyMarkup = keyboard
+	_, _ = bot.Send(msg)
+}
+
+func CreateTask(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, text string, checklistID int64) {
+
+	var count int64
+	db.Model(&models.ChecklistTask{}).Where("checklist_id = ?", checklistID).Count(&count)
+
+	count++
+
+	task := models.ChecklistTask{
+		ChecklistID: uint(checklistID),
+		Name:        text,
+		Order:       uint(count),
+	}
+
+	if err := db.Create(&task).Error; err != nil {
+		log.Printf("Ошибка создания задачи: %v", err)
+		msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("Произошла ошибка при создании задачи для чеклиста %d", checklistID))
+		_, _ = bot.Send(msg)
+	} else {
+		msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("Вы создали задачу %d.%s", task.Order, task.Name))
+		_, _ = bot.Send(msg)
+	}
+}
+
+func ListTasks(db *gorm.DB, bot *tgbotapi.BotAPI, chatID int64, checklistID int64) {
+	var tasks []models.ChecklistTask
+	var rows [][]tgbotapi.InlineKeyboardButton
+
+	if err := db.Where("checklist_id = ?", checklistID).Find(&tasks).Error; err != nil {
+		log.Printf("Ошибка получения задач: %v", err)
+		msg := tgbotapi.NewMessage(chatID, "Произошла ошибка при загрузке задач ❌")
+		_, _ = bot.Send(msg)
+		return
+	}
+
+	if len(tasks) == 0 {
+		msg := tgbotapi.NewMessage(chatID, "В этом чеклисте пока нет задач 🕐")
+		_, _ = bot.Send(msg)
+		return
+	}
+
+	for _, task := range tasks {
+		taskName := fmt.Sprintf("%d.%s", task.Order, task.Name)
+		row := tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(taskName, fmt.Sprintf("get_task:%d", task.ID)),
+		)
+		rows = append(rows, row)
+	}
+
+	msg := tgbotapi.NewMessage(chatID, "Ваши задачи")
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(rows...)
+	msg.ReplyMarkup = keyboard
+
 	_, _ = bot.Send(msg)
 }
